@@ -25,13 +25,4 @@ services:
         value: 100
       - key: TOP_K_CHUNKS
         value: 5
-      - key: DATABASE_URL
-        fromDatabase:
-          name: knowledge-ask-db
-          property: connectionString
     healthCheckPath: /health
-
-databases:
-  - name: knowledge-ask-db
-    databaseName: knowledge_ask_db
-    plan: free
