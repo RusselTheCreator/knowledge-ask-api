@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "postgresql"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["echo 'Build phase - no build needed for this project'"]
+
+[start]
+cmd = "npm start"
