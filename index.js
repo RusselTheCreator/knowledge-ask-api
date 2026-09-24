@@ -22,10 +22,7 @@ import authRoutes from './routes/authentication.js';
 import fileRoutes from './routes/files.js';
 import askRoutes from './routes/ask.js';
 import swaggerRoutes from './routes/swagger.js';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const initializeDatabase = require('./database/init.js');
+import initializeDatabase from './database/init.js';
 
 // Load environment variables from .env file
 // This must be done before accessing process.env

@@ -3,9 +3,13 @@
  * Initialize database schema on startup if tables don't exist
  */
 
-const pool = require('./db');
-const fs = require('fs');
-const path = require('path');
+import pool from './db.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function initializeDatabase() {
   const client = await pool.connect();
@@ -41,4 +45,4 @@ async function initializeDatabase() {
   }
 }
 
-module.exports = initializeDatabase;
+export default initializeDatabase;

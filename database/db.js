@@ -4,8 +4,12 @@
  * Configuration is pulled from environment variables.
  */
 
-const { Pool } = require('pg');
-require('dotenv').config();
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const { Pool } = pg;
 
 /**
  * Create a new connection pool.
@@ -34,4 +38,4 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-module.exports = pool;
+export default pool;
