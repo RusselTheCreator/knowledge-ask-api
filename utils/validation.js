@@ -99,7 +99,7 @@ function validateFileUpload(file, maxSizeBytes, allowedMimeTypes) {
   };
 }
 
-module.exports = {
+export {
   isValidEmail,
   isValidPassword,
   validateRegistration,

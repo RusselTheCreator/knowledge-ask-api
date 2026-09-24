@@ -34,4 +34,4 @@ function authorize(...roles) {
   };
 }
 
-module.exports = authorize;
+export default authorize;

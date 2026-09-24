@@ -4,7 +4,7 @@
  * Verifies the JWT token from the Authorization header and attaches user info to req.user.
  */
 
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 /**
  * Authenticate middleware
@@ -45,4 +45,4 @@ function authenticate(req, res, next) {
   }
 }
 
-module.exports = authenticate;
+export default authenticate;
