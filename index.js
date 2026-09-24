@@ -116,22 +116,35 @@ app.use((err, req, res, next) => {
 
 /**
  * START SERVER
- * Begin listening for HTTP requests
+ * Initialize database and begin listening for HTTP requests
  */
 
-app.listen(PORT, () => {
-  console.log('');
-  console.log('═══════════════════════════════════════════════════');
-  console.log('  🚀 Knowledge Ask API Server Started');
-  console.log('═══════════════════════════════════════════════════');
-  console.log(`  📡 Server:      http://localhost:${PORT}`);
-  console.log(`  📚 API Docs:    http://localhost:${PORT}/api/docs`);
-  console.log(`  🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`  🤖 LLM:         ${process.env.LLM_PROVIDER || 'mock'}`);
-  console.log(`  🧮 Embeddings:  ${process.env.EMBEDDING_PROVIDER || 'mock'}`);
-  console.log('═══════════════════════════════════════════════════');
-  console.log('');
-});
+async function startServer() {
+  try {
+    // Initialize database schema
+    await initializeDatabase();
+    
+    // Start listening
+    app.listen(PORT, () => {
+      console.log('');
+      console.log('═══════════════════════════════════════════════════');
+      console.log('  🚀 Knowledge Ask API Server Started');
+      console.log('═══════════════════════════════════════════════════');
+      console.log(`  📡 Server:      http://localhost:${PORT}`);
+      console.log(`  📚 API Docs:    http://localhost:${PORT}/api/docs`);
+      console.log(`  🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`  🤖 LLM:         ${process.env.LLM_PROVIDER || 'mock'}`);
+      console.log(`  🧮 Embeddings:  ${process.env.EMBEDDING_PROVIDER || 'mock'}`);
+      console.log('═══════════════════════════════════════════════════');
+      console.log('');
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Export app for testing
 export default app;
