@@ -31,6 +31,7 @@ dotenv.config();
 const app = express();
 
 // Get port from environment or use default 6544
+// Railway/Render often use dynamic ports, so prioritize env PORT
 const PORT = process.env.PORT || 6544;
 
 /**
