@@ -9,7 +9,9 @@
     "dev": "node --watch index.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --testPathIgnorePatterns=e2e",
     "test:e2e": "playwright test",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "pre-deploy": "bash scripts/pre-deploy-check.sh",
+    "deploy": "npm run pre-deploy && git push origin main"
   },
   "keywords": ["express", "postgresql", "rag", "llm", "jwt"],
   "author": "",

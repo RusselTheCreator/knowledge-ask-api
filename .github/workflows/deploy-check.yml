@@ -1,0 +1,41 @@
+name: Pre-Deployment Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Check for CommonJS in ES modules
+      run: |
+        if grep -r "module.exports\|require(" --include="*.js" --exclude-dir=node_modules . | grep -v "test"; then
+          echo "❌ CommonJS syntax found in ES module project"
+          exit 1
+        fi
+        
+    - name: Verify imports
+      run: node --check index.js
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Test server startup
+      run: |
+        timeout 10 npm start &
+        sleep 5
+        curl http://localhost:6544/health || exit 1
