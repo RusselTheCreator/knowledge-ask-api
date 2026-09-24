@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "LLM_PROVIDER": "mock",
+    "EMBEDDING_PROVIDER": "mock",
+    "MAX_FILE_SIZE_MB": "10",
+    "UPLOAD_DIR": "/tmp/uploads",
+    "CHUNK_SIZE": "500",
+    "CHUNK_OVERLAP": "50",
+    "TOP_K_CHUNKS": "5"
+  }
+}

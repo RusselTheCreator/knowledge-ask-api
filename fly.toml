@@ -1,0 +1,30 @@
+# fly.toml app configuration file
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "knowledge-ask-api"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  LLM_PROVIDER = "mock"
+  EMBEDDING_PROVIDER = "mock"
+  MAX_FILE_SIZE_MB = "10"
+  UPLOAD_DIR = "./uploads"
+  CHUNK_SIZE = "500"
+  CHUNK_OVERLAP = "50"
+  TOP_K_CHUNKS = "5"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
