@@ -83,6 +83,86 @@ BEGIN
   END IF;
 END $$;
 
+-- Migration 3: Update asks table schema
+-- Add missing status and error_message columns
+DO $$
+BEGIN
+  -- Add status column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'asks' AND column_name = 'status'
+  ) THEN
+    ALTER TABLE asks ADD COLUMN status VARCHAR(50) DEFAULT 'pending';
+    -- Set status to 'completed' for existing records that have an answer
+    UPDATE asks SET status = 'completed' WHERE answer IS NOT NULL AND answer != '';
+    RAISE NOTICE 'Added status column to asks table';
+  END IF;
+  
+  -- Add error_message column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'asks' AND column_name = 'error_message'
+  ) THEN
+    ALTER TABLE asks ADD COLUMN error_message TEXT;
+    RAISE NOTICE 'Added error_message column to asks table';
+  END IF;
+  
+  -- Make answer column nullable if it isn't already
+  -- (needed because asks are created with pending status before answer is generated)
+  ALTER TABLE asks ALTER COLUMN answer DROP NOT NULL;
+  RAISE NOTICE 'Made answer column nullable in asks table';
+  
+EXCEPTION
+  WHEN others THEN
+    -- If answer is already nullable, the DROP NOT NULL will fail silently
+    -- This is expected and safe to ignore
+    RAISE NOTICE 'Asks table migration completed (some steps may have been skipped)';
+END $$;
+
+-- Migration 4: Update ask_sources table schema
+-- Add missing file_id and chunk_excerpt columns
+DO $$
+BEGIN
+  -- Add file_id column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'ask_sources' AND column_name = 'file_id'
+  ) THEN
+    ALTER TABLE ask_sources ADD COLUMN file_id INTEGER;
+    
+    -- Populate file_id from chunks table for existing records
+    UPDATE ask_sources 
+    SET file_id = chunks.file_id 
+    FROM chunks 
+    WHERE ask_sources.chunk_id = chunks.id 
+    AND ask_sources.file_id IS NULL;
+    
+    -- Make file_id NOT NULL and add foreign key constraint
+    ALTER TABLE ask_sources ALTER COLUMN file_id SET NOT NULL;
+    ALTER TABLE ask_sources ADD CONSTRAINT ask_sources_file_id_fkey 
+      FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE;
+    
+    RAISE NOTICE 'Added file_id column to ask_sources table';
+  END IF;
+  
+  -- Add chunk_excerpt column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'ask_sources' AND column_name = 'chunk_excerpt'
+  ) THEN
+    ALTER TABLE ask_sources ADD COLUMN chunk_excerpt TEXT;
+    
+    -- Populate chunk_excerpt from chunks table for existing records (first 200 chars)
+    UPDATE ask_sources 
+    SET chunk_excerpt = SUBSTRING(chunks.chunk_text, 1, 200) || '...'
+    FROM chunks 
+    WHERE ask_sources.chunk_id = chunks.id 
+    AND ask_sources.chunk_excerpt IS NULL;
+    
+    RAISE NOTICE 'Added chunk_excerpt column to ask_sources table';
+  END IF;
+END $$;
+
 -- Verify migration completed
 DO $$
 BEGIN

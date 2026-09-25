@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS asks (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   question TEXT NOT NULL,
-  answer TEXT NOT NULL,
+  answer TEXT,
+  status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'error'
+  error_message TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -51,8 +53,10 @@ CREATE TABLE IF NOT EXISTS asks (
 CREATE TABLE IF NOT EXISTS ask_sources (
   id SERIAL PRIMARY KEY,
   ask_id INTEGER NOT NULL REFERENCES asks(id) ON DELETE CASCADE,
+  file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
   chunk_id INTEGER NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
-  relevance_score FLOAT
+  relevance_score FLOAT,
+  chunk_excerpt TEXT
 );
 
 -- Indexes for better query performance
