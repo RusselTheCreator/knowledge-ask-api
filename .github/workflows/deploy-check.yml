@@ -35,6 +35,8 @@ jobs:
       run: npm test
       
     - name: Test server startup
+      env:
+        NODE_ENV: development
       run: |
         timeout 10 npm start &
         sleep 5
