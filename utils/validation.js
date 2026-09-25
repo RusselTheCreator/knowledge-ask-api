@@ -56,10 +56,25 @@ function validatePassword(password) {
 }
 
 /**
+ * Normalize role to consistent capitalized format
+ * 
+ * @param {string} role - Role string (any case)
+ * @returns {string|null} Normalized role ('User' or 'Admin') or null if invalid
+ */
+function normalizeRole(role) {
+  if (!role || typeof role !== 'string') {
+    return null;
+  }
+  
+  const normalized = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+  return ['User', 'Admin'].includes(normalized) ? normalized : null;
+}
+
+/**
  * Validate user registration data
  * 
- * @param {Object} data - Registration data { email, password, role? }
- * @returns {Object} { valid: boolean, errors: string[] }
+ * @param {Object} data - Registration data { name, email, password, role? }
+ * @returns {Object} { valid: boolean, errors: string[], normalizedRole: string }
  */
 function validateRegistration(data) {
   const errors = [];
@@ -82,13 +97,21 @@ function validateRegistration(data) {
     errors.push('Name must not exceed 255 characters.');
   }
   
-  if (data.role && !['User', 'Admin'].includes(data.role)) {
-    errors.push('Role must be either "User" or "Admin".');
+  // Normalize and validate role
+  let normalizedRole = 'User'; // Default role
+  if (data.role) {
+    const normalized = normalizeRole(data.role);
+    if (normalized === null) {
+      errors.push('Role must be either "User" or "Admin".');
+    } else {
+      normalizedRole = normalized;
+    }
   }
   
   return {
     valid: errors.length === 0,
-    errors
+    errors,
+    normalizedRole
   };
 }
 
@@ -182,6 +205,7 @@ export {
   isValidEmail,
   isValidPassword,
   validatePassword,
+  normalizeRole,
   validateRegistration,
   validateFileUpload
 };
@@ -191,6 +215,7 @@ export default {
   isValidEmail,
   isValidPassword,
   validatePassword,
+  normalizeRole,
   validateRegistration,
   validateFileUpload
 };

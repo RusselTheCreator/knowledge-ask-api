@@ -7,9 +7,10 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Users table: stores registered users
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(50) NOT NULL DEFAULT 'user', -- 'user' or 'admin'
+  password VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'User', -- 'User' or 'Admin'
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -17,13 +18,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS files (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  filename VARCHAR(255) NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
   size_bytes INTEGER NOT NULL,
-  upload_path TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
   status VARCHAR(50) DEFAULT 'processing', -- 'processing', 'ready', 'error'
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Chunks table: stores text chunks extracted from files with their embeddings

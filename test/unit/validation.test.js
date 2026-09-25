@@ -63,17 +63,42 @@ describe('Validation Utilities', () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
     
-    test('returns error for invalid role', () => {
-      const data = {
+    test('normalizes role to User or Admin', () => {
+      // Test valid role normalization
+      const data1 = {
+        name: 'John',
+        email: 'john@example.com',
+        password: 'Password123!',
+        role: 'user'
+      };
+      
+      const result1 = validateRegistration(data1);
+      expect(result1.valid).toBe(true);
+      expect(result1.normalizedRole).toBe('User');
+      
+      // Test admin normalization
+      const data2 = {
+        name: 'John',
+        email: 'john@example.com',
+        password: 'Password123!',
+        role: 'admin'
+      };
+      
+      const result2 = validateRegistration(data2);
+      expect(result2.valid).toBe(true);
+      expect(result2.normalizedRole).toBe('Admin');
+      
+      // Test invalid role defaults to User
+      const data3 = {
         name: 'John',
         email: 'john@example.com',
         password: 'Password123!',
         role: 'SuperAdmin'
       };
       
-      const result = validateRegistration(data);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('Role'))).toBe(true);
+      const result3 = validateRegistration(data3);
+      expect(result3.valid).toBe(false);
+      expect(result3.errors.some(e => e.includes('Role'))).toBe(true);
     });
   });
 });
