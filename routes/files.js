@@ -22,6 +22,7 @@ import authenticate from '../middleware/authenticate.js';
 import authorize from '../middleware/authorize.js';
 import { validateFileUpload } from '../utils/validation.js';
 import { ingestDocument } from '../services/documentProcessor.js';
+import { uploadRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -41,7 +42,32 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+// File size limit enforcement
+const MAX_FILE_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB) || 10) * 1024 * 1024;
+
+// Allowed MIME types
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'text/csv'
+];
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: MAX_FILE_SIZE,
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Supported types: PDF, TXT, MD, DOCX, CSV`));
+    }
+  }
+});
 
 /**
  * @swagger
@@ -69,9 +95,35 @@ const upload = multer({ storage });
  *       401:
  *         description: Unauthorized
  */
-router.post('/', authenticate, upload.single('file'), async (req, res) => {
+// Multer error handler middleware
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        error: `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)} MB`
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        error: 'Too many files. Please upload one file at a time'
+      });
+    }
+    return res.status(400).json({
+      error: 'File upload error',
+      details: err.message
+    });
+  }
+  if (err) {
+    return res.status(400).json({
+      error: err.message || 'File upload failed'
+    });
+  }
+  next();
+};
+
+router.post('/', authenticate, uploadRateLimiter, upload.single('file'), handleMulterError, async (req, res) => {
   try {
-    // Validate the uploaded file
+    // Additional validation (multer handles basic checks now)
     const validation = validateFileUpload(req.file);
     if (!validation.valid) {
       // Delete the uploaded file if validation fails

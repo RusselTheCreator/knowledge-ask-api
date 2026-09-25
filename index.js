@@ -41,8 +41,18 @@ const PORT = process.env.PORT || 6544;
  */
 
 // Enable CORS for cross-origin requests
-// Allows the API to be accessed from web browsers on different domains
-app.use(cors());
+// Configurable via CORS_ORIGINS environment variable (comma-separated list)
+// Default allows localhost development origins for Vite and common dev servers
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:6544'];
+
+app.use(cors({
+  origin: corsOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Parse JSON request bodies
 // Allows us to access req.body as a JavaScript object
@@ -76,8 +86,30 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint for monitoring
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Checks server status and optionally database connectivity
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  // Optional: check database connectivity (adds latency, so make it optional via query param)
+  if (req.query.check === 'full') {
+    try {
+      const { default: pool } = await import('./database/db.js');
+      const result = await pool.query('SELECT 1 as health_check');
+      health.database = result.rows[0].health_check === 1 ? 'connected' : 'error';
+    } catch (error) {
+      health.database = 'disconnected';
+      health.status = 'degraded';
+      console.error('Health check database error:', error.message);
+    }
+  }
+  
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // Mount route modules
@@ -112,12 +144,58 @@ app.use((err, req, res, next) => {
 });
 
 /**
+ * Configuration validation
+ * Ensures critical security settings are properly configured
+ */
+function validateConfiguration() {
+  const errors = [];
+  
+  // Validate JWT secret strength (except in development)
+  if (process.env.NODE_ENV !== 'development') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      errors.push('JWT_SECRET must be set and at least 32 characters long in production');
+      errors.push('Generate a secure secret with: openssl rand -base64 32');
+    }
+    
+    // Check for placeholder/weak secrets
+    const weakSecrets = ['your-secret-key', 'change-this', 'secret', 'password'];
+    if (weakSecrets.some(weak => process.env.JWT_SECRET?.toLowerCase().includes(weak))) {
+      errors.push('JWT_SECRET appears to be a placeholder or weak value');
+      errors.push('Use a strong random secret: openssl rand -base64 32');
+    }
+  } else {
+    // Development warning if JWT secret is weak
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      console.warn('⚠️  WARNING: JWT_SECRET is weak or missing (OK for development only)');
+      console.warn('   Generate secure secret: openssl rand -base64 32');
+    }
+  }
+  
+  // Validate required environment variables
+  if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
+    errors.push('DATABASE_URL or DB_HOST must be configured');
+  }
+  
+  return errors;
+}
+
+/**
  * START SERVER
  * Initialize database and begin listening for HTTP requests
  */
 
 async function startServer() {
   try {
+    // Validate configuration before starting
+    const configErrors = validateConfiguration();
+    if (configErrors.length > 0) {
+      console.error('❌ Configuration validation failed:');
+      configErrors.forEach(error => console.error(`   - ${error}`));
+      if (process.env.NODE_ENV !== 'development') {
+        process.exit(1);
+      }
+    }
+    
     // Initialize database schema
     await initializeDatabase();
     

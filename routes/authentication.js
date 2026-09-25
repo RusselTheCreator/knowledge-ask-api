@@ -13,8 +13,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../database/db.js';
 import { validateRegistration, isValidEmail } from '../utils/validation.js';
+import { authRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
+
+// Apply rate limiting to all authentication routes
+router.use(authRateLimiter);
 
 /**
  * @swagger
@@ -56,9 +60,9 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   try {
     // Extract user data from request body
-    const { name, email, password, role = 'User' } = req.body;
+    const { name, email, password, role } = req.body;
     
-    // Validate input data
+    // Validate input data (also normalizes role to 'User' or 'Admin')
     const validation = validateRegistration({ name, email, password, role });
     if (!validation.valid) {
       return res.status(400).json({
@@ -66,6 +70,9 @@ router.post('/register', async (req, res) => {
         details: validation.errors
       });
     }
+    
+    // Use normalized role from validation
+    const normalizedRole = validation.normalizedRole;
     
     // Check if user with this email already exists
     const existingUser = await pool.query(
@@ -88,7 +95,7 @@ router.post('/register', async (req, res) => {
       `INSERT INTO users (name, email, password, role)
        VALUES ($1, $2, $3, $4)
        RETURNING id, name, email, role, created_at`,
-      [name, email.toLowerCase(), hashedPassword, role]
+      [name, email.toLowerCase(), hashedPassword, normalizedRole]
     );
     
     const newUser = result.rows[0];

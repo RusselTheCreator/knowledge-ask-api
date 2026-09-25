@@ -38,10 +38,43 @@ function isValidPassword(password) {
 }
 
 /**
+ * Validate password with detailed result
+ * Wrapper around isValidPassword that returns object with validation details
+ * 
+ * @param {string} password - Password to validate
+ * @returns {Object} { valid: boolean, message?: string }
+ */
+function validatePassword(password) {
+  if (!password || password.length < 6) {
+    return {
+      valid: false,
+      message: 'Password must be at least 6 characters long'
+    };
+  }
+  
+  return { valid: true };
+}
+
+/**
+ * Normalize role to consistent capitalized format
+ * 
+ * @param {string} role - Role string (any case)
+ * @returns {string|null} Normalized role ('User' or 'Admin') or null if invalid
+ */
+function normalizeRole(role) {
+  if (!role || typeof role !== 'string') {
+    return null;
+  }
+  
+  const normalized = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+  return ['User', 'Admin'].includes(normalized) ? normalized : null;
+}
+
+/**
  * Validate user registration data
  * 
- * @param {Object} data - Registration data { email, password, role? }
- * @returns {Object} { valid: boolean, errors: string[] }
+ * @param {Object} data - Registration data { name, email, password, role? }
+ * @returns {Object} { valid: boolean, errors: string[], normalizedRole: string }
  */
 function validateRegistration(data) {
   const errors = [];
@@ -58,50 +91,131 @@ function validateRegistration(data) {
     errors.push('Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.');
   }
   
-  if (data.role && !['user', 'admin'].includes(data.role)) {
-    errors.push('Role must be either "user" or "admin".');
+  if (!data.name || data.name.trim().length === 0) {
+    errors.push('Name is required.');
+  } else if (data.name.length > 255) {
+    errors.push('Name must not exceed 255 characters.');
+  }
+  
+  // Normalize and validate role
+  let normalizedRole = 'User'; // Default role
+  if (data.role) {
+    const normalized = normalizeRole(data.role);
+    if (normalized === null) {
+      errors.push('Role must be either "User" or "Admin".');
+    } else {
+      normalizedRole = normalized;
+    }
   }
   
   return {
     valid: errors.length === 0,
-    errors
+    errors,
+    normalizedRole
   };
 }
 
 /**
  * Validate file upload
- * Checks file size and mime type against allowed values.
+ * Checks file size, mime type, and extension against allowed values.
+ * Protects against malicious uploads and directory traversal.
  * 
  * @param {Object} file - Multer file object
- * @param {number} maxSizeBytes - Maximum file size in bytes
- * @param {string[]} allowedMimeTypes - Array of allowed MIME types
- * @returns {Object} { valid: boolean, errors: string[] }
+ * @returns {Object} { valid: boolean, error: string }
  */
-function validateFileUpload(file, maxSizeBytes, allowedMimeTypes) {
-  const errors = [];
+function validateFileUpload(file) {
+  // Get configuration from environment
+  const maxSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB) || 10;
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+  
+  // Allowed MIME types for document processing
+  const allowedMimeTypes = [
+    'application/pdf',
+    'text/plain',
+    'text/markdown',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'text/csv'
+  ];
+  
+  // Allowed file extensions (additional security layer)
+  const allowedExtensions = ['.pdf', '.txt', '.md', '.docx', '.csv'];
   
   if (!file) {
-    errors.push('No file provided.');
-    return { valid: false, errors };
+    return { 
+      valid: false, 
+      error: 'No file provided. Please upload a file.' 
+    };
+  }
+  
+  // Check file size
+  if (file.size === 0) {
+    return { 
+      valid: false, 
+      error: 'File is empty. Please upload a file with content.' 
+    };
   }
   
   if (file.size > maxSizeBytes) {
-    errors.push(`File size exceeds maximum allowed size of ${maxSizeBytes / (1024 * 1024)} MB.`);
+    return { 
+      valid: false, 
+      error: `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed size of ${maxSizeMB} MB.` 
+    };
   }
   
+  // Check MIME type
   if (!allowedMimeTypes.includes(file.mimetype)) {
-    errors.push(`File type ${file.mimetype} is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}.`);
+    return { 
+      valid: false, 
+      error: `File type '${file.mimetype}' is not supported. Allowed types: PDF, TXT, MD, DOCX, CSV.` 
+    };
+  }
+  
+  // Check file extension (additional security against MIME type spoofing)
+  const fileExtension = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+  if (!allowedExtensions.includes(fileExtension)) {
+    return { 
+      valid: false, 
+      error: `File extension '${fileExtension}' is not allowed. Allowed extensions: ${allowedExtensions.join(', ')}.` 
+    };
+  }
+  
+  // Check for directory traversal attempts in filename
+  if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+    return { 
+      valid: false, 
+      error: 'Invalid filename. Filename must not contain path separators or parent directory references.' 
+    };
+  }
+  
+  // Check filename length
+  if (file.originalname.length > 255) {
+    return { 
+      valid: false, 
+      error: 'Filename is too long. Maximum length is 255 characters.' 
+    };
   }
   
   return {
-    valid: errors.length === 0,
-    errors
+    valid: true,
+    error: null
   };
 }
 
 export {
   isValidEmail,
   isValidPassword,
+  validatePassword,
+  normalizeRole,
+  validateRegistration,
+  validateFileUpload
+};
+
+// Default export for backwards compatibility
+export default {
+  isValidEmail,
+  isValidPassword,
+  validatePassword,
+  normalizeRole,
   validateRegistration,
   validateFileUpload
 };

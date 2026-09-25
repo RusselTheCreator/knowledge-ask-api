@@ -10,7 +10,7 @@ A complete RAG-powered (Retrieval-Augmented Generation) knowledge base API built
 - **RAG-Based Q&A**: Ask questions about your documents and get answers with source citations
 - **Vector Similarity Search**: Uses pgvector extension for efficient semantic search
 - **Mock Provider Support**: Works out-of-the-box without API keys (uses deterministic mock LLM/embeddings)
-- **Real LLM Support**: Switchable to OpenAI or Google Gemini for production use
+- **Real LLM Support**: Switchable to OpenAI for production use (cost-effective models)
 - **Comprehensive API Documentation**: Interactive Swagger UI at `/api/docs`
 - **Complete Test Coverage**: Unit tests, API tests, and E2E Playwright tests
 
@@ -40,7 +40,7 @@ cp .env.example .env
 The default configuration uses:
 - **Port**: 6544 (to avoid conflicts with other services)
 - **Database**: PostgreSQL on localhost:5432
-- **LLM Provider**: `mock` (no API key required)
+- **LLM Provider**: `mock` (no API key required, perfect for development)
 - **Embedding Provider**: `mock` (no API key required)
 
 ### 3. Start PostgreSQL with Docker Compose
@@ -142,9 +142,46 @@ All endpoints require authentication
 
 ## 🤖 Using Real LLM Providers
 
-By default, the API uses mock providers that require no API keys. To use real AI models:
+By default, the API uses mock providers that require no API keys. To use real AI models for production:
 
-### Option 1: Google Gemini (Recommended - Cost-Effective)
+### Using OpenAI (Recommended)
+
+1. Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. **Important**: Set usage limits in your OpenAI dashboard before deploying!
+3. Update your `.env`:
+   ```env
+   LLM_PROVIDER=openai
+   EMBEDDING_PROVIDER=openai
+   OPENAI_API_KEY=your-api-key-here
+   ```
+
+**Default Models** (cost-effective, suitable for Free tier):
+- **LLM**: `gpt-4o-mini` (can override with `OPENAI_CHAT_MODEL`)
+- **Embeddings**: `text-embedding-3-small` (can override with `OPENAI_EMBEDDING_MODEL`)
+
+### Mock Provider (Development/CI)
+
+Default configuration - no API key needed:
+
+```env
+LLM_PROVIDER=mock
+EMBEDDING_PROVIDER=mock
+```
+
+Perfect for:
+- Local development
+- CI/CD pipelines
+- Testing without API costs
+- Development without external dependencies
+
+**Note**: The mock provider generates deterministic, context-based responses suitable for testing but not for production use.
+
+### Alternative Providers
+
+<details>
+<summary>Google Gemini (optional, not recommended for this deployment)</summary>
+
+If you prefer Gemini:
 
 1. Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Update your `.env`:
@@ -158,26 +195,7 @@ Uses:
 - LLM: Gemini 2.5 Flash-Lite
 - Embeddings: text-embedding-004
 
-### Option 2: OpenAI
-
-1. Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Update your `.env`:
-   ```env
-   LLM_PROVIDER=openai
-   EMBEDDING_PROVIDER=openai
-   OPENAI_API_KEY=your-api-key-here
-   ```
-
-Uses:
-- LLM: GPT-4o-mini
-- Embeddings: text-embedding-3-small
-
-### Switching Back to Mock
-
-```env
-LLM_PROVIDER=mock
-EMBEDDING_PROVIDER=mock
-```
+</details>
 
 ## 🏗️ Architecture
 
@@ -210,11 +228,14 @@ EMBEDDING_PROVIDER=mock
 ## 🔐 Security Features
 
 - **Password Hashing**: Bcrypt with salt rounds
-- **JWT Authentication**: Secure token-based auth with expiration
+- **JWT Authentication**: Secure token-based auth with 1-hour expiration
 - **SQL Injection Prevention**: Parameterized queries throughout
-- **File Upload Validation**: MIME type and size checks
+- **File Upload Validation**: MIME type, size, and extension checks with path traversal protection
+- **Rate Limiting**: Configurable limits on auth, upload, and ask endpoints
+- **CORS Protection**: Configurable allowed origins via environment variable
 - **Role-Based Access Control**: User vs Admin permissions
-- **Cross-User Isolation**: Users can only access their own data
+- **Cross-User Isolation**: Users can only access their own data (IDOR protection)
+- **No Default Admin**: Default admin account disabled by default (requires explicit opt-in)
 
 ## 🎯 How RAG Works
 
@@ -236,15 +257,36 @@ EMBEDDING_PROVIDER=mock
 - **asks**: User questions and generated answers
 - **ask_sources**: Links answers to source chunks
 
-## 📊 Default Admin Account
+## 📊 Admin Account Setup
 
-For testing, a default admin account is created:
+**Security Note**: No default admin account is created automatically.
 
-- **Email**: admin@example.com
-- **Password**: admin123
-- **Role**: Admin
+### For Local Development/Testing Only
 
-⚠️ **Change or remove this in production!**
+To enable a default admin account (NOT for production):
+
+1. Set environment variable:
+   ```env
+   ENABLE_DEFAULT_ADMIN=true
+   ```
+
+2. Restart the server. Default credentials:
+   - **Email**: admin@example.com
+   - **Password**: admin123
+
+⚠️ **NEVER enable default admin in production!**
+
+### For Production
+
+Create admin users manually:
+
+1. Register a user account via the API
+2. Manually update the user's role in the database:
+   ```sql
+   UPDATE users SET role = 'Admin' WHERE email = 'your-admin@example.com';
+   ```
+
+3. Use a strong, unique password
 
 ## 🐛 Troubleshooting
 
@@ -292,16 +334,16 @@ npm run test:all
 ### 1. Register and Login
 
 ```bash
-# Register
+# Register (password must meet complexity requirements)
 curl -X POST http://localhost:6544/api/authentication/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com","password":"password123"}'
+  -d '{"name":"John Doe","email":"john@example.com","password":"SecurePass123!"}'
 
 # Login
 curl -X POST http://localhost:6544/api/authentication/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"password123"}'
-# Save the returned token
+  -d '{"email":"john@example.com","password":"SecurePass123!"}'
+# Save the returned token for subsequent requests
 ```
 
 ### 2. Upload a Document
@@ -310,6 +352,7 @@ curl -X POST http://localhost:6544/api/authentication/login \
 curl -X POST http://localhost:6544/api/files \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@./document.pdf"
+# Processing happens in background; check status with GET /api/files/:id
 ```
 
 ### 3. Ask a Question
@@ -319,6 +362,17 @@ curl -X POST http://localhost:6544/api/ask \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"question":"What is the main topic of the document?"}'
+# Returns answer with source citations
+```
+
+### 4. Health Check
+
+```bash
+# Basic health check
+curl http://localhost:6544/health
+
+# Full health check (includes database connectivity)
+curl http://localhost:6544/health?check=full
 ```
 
 ## 🤝 Code Style

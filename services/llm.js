@@ -5,10 +5,12 @@
  * It takes a question and context (retrieved document chunks) and
  * generates an answer with source citations.
  * 
- * Supports multiple providers:
- * - mock: Deterministic answers based on context (no API key needed)
- * - gemini: Google Gemini 2.5 Flash-Lite (cost-effective)
- * - openai: OpenAI GPT-4o-mini
+ * Supported providers:
+ * - mock: Deterministic answers based on context (no API key needed, default)
+ * - openai: OpenAI GPT-4o-mini (cost-effective, recommended for production)
+ * 
+ * Note: Gemini support available but not recommended for this deployment.
+ * Set LLM_PROVIDER=gemini if needed (requires GEMINI_API_KEY).
  */
 
 import dotenv from 'dotenv';
@@ -46,7 +48,9 @@ function generateMockAnswer(question, chunks) {
 }
 
 /**
- * Generate an answer using OpenAI GPT-4o-mini
+ * Generate an answer using OpenAI
+ * Uses gpt-4o-mini by default (cost-effective, suitable for Free tier)
+ * Model can be overridden via OPENAI_CHAT_MODEL environment variable
  * 
  * @param {string} question - User's question
  * @param {Array} chunks - Retrieved context chunks
@@ -58,6 +62,10 @@ async function generateOpenAIAnswer(question, chunks) {
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is required for OpenAI LLM');
   }
+  
+  // Use cheap model suitable for Free tier
+  // gpt-4o-mini is cost-effective and performant for RAG tasks
+  const model = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
   
   // Build context from chunks
   const context = chunks
@@ -76,7 +84,7 @@ Always cite which source(s) you used in your answer. If the context doesn't cont
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
