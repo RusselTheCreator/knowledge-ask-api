@@ -13,8 +13,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../database/db.js';
 import { validateRegistration, isValidEmail } from '../utils/validation.js';
+import { authRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
+
+// Apply rate limiting to all authentication routes
+router.use(authRateLimiter);
 
 /**
  * @swagger

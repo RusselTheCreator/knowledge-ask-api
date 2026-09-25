@@ -22,6 +22,7 @@ import authenticate from '../middleware/authenticate.js';
 import authorize from '../middleware/authorize.js';
 import { validateFileUpload } from '../utils/validation.js';
 import { ingestDocument } from '../services/documentProcessor.js';
+import { uploadRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -69,7 +70,7 @@ const upload = multer({ storage });
  *       401:
  *         description: Unauthorized
  */
-router.post('/', authenticate, upload.single('file'), async (req, res) => {
+router.post('/', authenticate, uploadRateLimiter, upload.single('file'), async (req, res) => {
   try {
     // Validate the uploaded file
     const validation = validateFileUpload(req.file);

@@ -59,8 +59,10 @@ CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON chunks(file_id);
 CREATE INDEX IF NOT EXISTS idx_asks_user_id ON asks(user_id);
 CREATE INDEX IF NOT EXISTS idx_ask_sources_ask_id ON ask_sources(ask_id);
 
--- Default admin user (password: Admin@123)
--- Password hash generated using bcrypt with 10 rounds
-INSERT INTO users (email, password_hash, role) 
-VALUES ('admin@example.com', '$2a$10$rO5bxYXYxYXYxYXYxYXYxO5bxYXYxYXYxYXYxYXYxYXYxYXYxYXY', 'admin')
-ON CONFLICT (email) DO NOTHING;
+-- Default admin user (DISABLED for security)
+-- To enable for development/testing, set ENABLE_DEFAULT_ADMIN=true in .env
+-- Default password: admin123 (CHANGE IMMEDIATELY if enabled)
+-- Actual seeding is done in database/init.js based on environment variable
+-- 
+-- SECURITY WARNING: Never enable default admin in production!
+-- Always create admin users manually with strong passwords.

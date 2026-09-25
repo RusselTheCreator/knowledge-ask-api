@@ -42,7 +42,7 @@ describe('Validation Utilities', () => {
       const data = {
         name: 'John Doe',
         email: 'john@example.com',
-        password: 'password123',
+        password: 'Password123!',
         role: 'User'
       };
       
@@ -67,7 +67,7 @@ describe('Validation Utilities', () => {
       const data = {
         name: 'John',
         email: 'john@example.com',
-        password: 'password123',
+        password: 'Password123!',
         role: 'SuperAdmin'
       };
       

@@ -15,6 +15,7 @@ import pool from '../database/db.js';
 import authenticate from '../middleware/authenticate.js';
 import { generateEmbedding, cosineSimilarity } from '../services/embeddings.js';
 import { generateAnswer } from '../services/llm.js';
+import { askRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, askRateLimiter, async (req, res) => {
   try {
     const { question, fileIds } = req.body;
     

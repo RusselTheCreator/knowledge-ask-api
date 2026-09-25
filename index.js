@@ -41,8 +41,18 @@ const PORT = process.env.PORT || 6544;
  */
 
 // Enable CORS for cross-origin requests
-// Allows the API to be accessed from web browsers on different domains
-app.use(cors());
+// Configurable via CORS_ORIGINS environment variable (comma-separated list)
+// Default allows localhost development origins for Vite and common dev servers
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:6544'];
+
+app.use(cors({
+  origin: corsOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Parse JSON request bodies
 // Allows us to access req.body as a JavaScript object
@@ -76,8 +86,30 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint for monitoring
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Checks server status and optionally database connectivity
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  // Optional: check database connectivity (adds latency, so make it optional via query param)
+  if (req.query.check === 'full') {
+    try {
+      const { default: pool } = await import('./database/db.js');
+      const result = await pool.query('SELECT 1 as health_check');
+      health.database = result.rows[0].health_check === 1 ? 'connected' : 'error';
+    } catch (error) {
+      health.database = 'disconnected';
+      health.status = 'degraded';
+      console.error('Health check database error:', error.message);
+    }
+  }
+  
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // Mount route modules

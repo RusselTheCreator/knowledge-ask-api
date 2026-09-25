@@ -4,10 +4,12 @@
  * This service generates vector embeddings from text, which are used
  * for semantic similarity search in the RAG system.
  * 
- * Supports multiple providers:
- * - mock: Deterministic pseudo-embeddings (no API key needed, great for tests)
- * - openai: OpenAI text-embedding-3-small
- * - gemini: Google Gemini embeddings
+ * Supported providers:
+ * - mock: Deterministic pseudo-embeddings (no API key needed, default)
+ * - openai: OpenAI text-embedding-3-small (cost-effective, recommended for production)
+ * 
+ * Note: Gemini support available but not recommended for this deployment.
+ * Set EMBEDDING_PROVIDER=gemini if needed (requires GEMINI_API_KEY).
  */
 
 import crypto from 'crypto';
@@ -45,7 +47,8 @@ function generateMockEmbedding(text) {
 
 /**
  * Generate embeddings using OpenAI API
- * Uses text-embedding-3-small model (cost-effective)
+ * Uses text-embedding-3-small model by default (cost-effective, suitable for Free tier)
+ * Model can be overridden via OPENAI_EMBEDDING_MODEL environment variable
  * 
  * @param {string} text - Text to embed
  * @returns {Promise<number[]>} Embedding vector
@@ -57,6 +60,9 @@ async function generateOpenAIEmbedding(text) {
     throw new Error('OPENAI_API_KEY environment variable is required for OpenAI embeddings');
   }
   
+  // Use cost-effective embedding model suitable for Free tier
+  const model = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
+  
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -64,7 +70,7 @@ async function generateOpenAIEmbedding(text) {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'text-embedding-3-small',
+      model,
       input: text,
       encoding_format: 'float'
     })
