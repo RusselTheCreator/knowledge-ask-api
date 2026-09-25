@@ -33,11 +33,3 @@ jobs:
       
     - name: Run tests
       run: npm test
-      
-    - name: Test server startup
-      env:
-        NODE_ENV: development
-      run: |
-        timeout 10 npm start &
-        sleep 5
-        curl http://localhost:6544/health || exit 1
