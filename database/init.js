@@ -45,6 +45,22 @@ async function initializeDatabase() {
       }
     } else {
       console.log('✓ Database schema already exists');
+      
+      // Run migrations to update schema if needed
+      console.log('Checking for pending migrations...');
+      try {
+        const migrationsPath = path.join(__dirname, 'migrations.sql');
+        if (fs.existsSync(migrationsPath)) {
+          const migrations = fs.readFileSync(migrationsPath, 'utf8');
+          await client.query(migrations);
+          console.log('✓ Database migrations applied successfully');
+        } else {
+          console.log('⚠️  No migrations file found (migrations.sql)');
+        }
+      } catch (migrationError) {
+        console.error('⚠️  Migration warning:', migrationError.message);
+        // Don't throw - migrations are best-effort for existing DBs
+      }
     }
   } catch (error) {
     console.error('Error initializing database:', error);
