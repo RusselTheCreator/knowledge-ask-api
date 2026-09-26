@@ -12,6 +12,7 @@ import path from 'path';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { parse as csvParse } from 'csv-parse/sync';
+import * as XLSX from 'xlsx';
 import { generateEmbedding } from './embeddings.js';
 import pool from '../database/db.js';
 import dotenv from 'dotenv';
@@ -27,6 +28,11 @@ dotenv.config();
  */
 export async function extractText(filePath, mimeType) {
   try {
+    // Handle images explicitly with clear error message
+    if (mimeType === 'image/png' || mimeType === 'image/jpeg') {
+      throw new Error('Image files are not supported until OCR functionality is added. Please upload text-based documents.');
+    }
+    
     // Read the file buffer
     const buffer = await fs.readFile(filePath);
     
@@ -44,6 +50,9 @@ export async function extractText(filePath, mimeType) {
       
       case 'text/csv':
         return await extractCSV(buffer);
+      
+      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        return await extractXLSX(buffer);
       
       default:
         // Try to treat as plain text as fallback
@@ -96,6 +105,43 @@ async function extractCSV(buffer) {
       .join(', ')
     )
     .join('\n');
+}
+
+/**
+ * Extract text from XLSX by converting sheets to readable format
+ * 
+ * @param {Buffer} buffer - XLSX file buffer
+ * @returns {Promise<string>} Extracted text (formatted)
+ */
+async function extractXLSX(buffer) {
+  // Parse the workbook
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  
+  const textParts = [];
+  
+  // Process each sheet in the workbook
+  workbook.SheetNames.forEach(sheetName => {
+    const sheet = workbook.Sheets[sheetName];
+    
+    // Convert sheet to JSON (array of objects)
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    
+    if (jsonData.length > 0) {
+      textParts.push(`Sheet: ${sheetName}`);
+      
+      // Convert each row to readable text format
+      jsonData.forEach(row => {
+        const rowText = Object.entries(row)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+        textParts.push(rowText);
+      });
+      
+      textParts.push(''); // Empty line between sheets
+    }
+  });
+  
+  return textParts.join('\n');
 }
 
 /**
@@ -161,6 +207,17 @@ export async function ingestDocument(fileId, filePath, mimeType) {
     const overlap = parseInt(process.env.CHUNK_OVERLAP) || 100;
     const chunks = chunkText(text, chunkSize, overlap);
     console.log(`✅ Created ${chunks.length} chunks`);
+    
+    // Fail-closed: If no chunks were created, mark as error
+    if (chunks.length === 0) {
+      const errorMsg = 'No extractable text content found. The file may be empty, a scanned PDF, or contain only images without text.';
+      console.error(`❌ Zero chunks for file ${fileId}: ${errorMsg}`);
+      await pool.query(
+        `UPDATE files SET status = 'error', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [errorMsg, fileId]
+      );
+      throw new Error(errorMsg);
+    }
     
     // Step 3 & 4: Generate embeddings and store in database
     for (let i = 0; i < chunks.length; i++) {
