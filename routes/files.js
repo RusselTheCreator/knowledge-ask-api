@@ -373,9 +373,24 @@ router.get('/:id/download', authenticate, async (req, res) => {
     
     const file = result.rows[0];
     
+    // Check if file exists on disk before attempting to read
+    try {
+      await fs.access(file.storage_path);
+    } catch (accessError) {
+      // File metadata exists but blob is missing (common with ephemeral storage)
+      console.warn(`File blob missing on disk: ${file.storage_path} (ID: ${fileId})`);
+      return res.status(404).json({
+        error: 'File content is no longer available',
+        details: 'The file metadata exists but the content is missing from storage. This may occur after service redeployments on ephemeral disk.'
+      });
+    }
+    
+    // Escape filename for Content-Disposition header to handle special characters
+    const sanitizedFilename = file.original_name.replace(/"/g, '\\"');
+    
     // Set headers for file download
     res.setHeader('Content-Type', file.mime_type);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
     
     // Stream the file from disk to response
     const fileStream = await fs.readFile(file.storage_path);
