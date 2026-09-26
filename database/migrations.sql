@@ -169,7 +169,19 @@ END $$;
 DO $$
 DECLARE
   current_dimension INTEGER;
+  column_exists BOOLEAN;
 BEGIN
+  -- Check if embedding column exists
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'chunks' AND column_name = 'embedding'
+  ) INTO column_exists;
+  
+  IF NOT column_exists THEN
+    RAISE NOTICE '✓ Chunks table will be created with correct dimensions';
+    RETURN;
+  END IF;
+  
   -- Get current embedding vector dimension
   SELECT atttypmod - 4 INTO current_dimension
   FROM pg_attribute
@@ -182,14 +194,16 @@ BEGIN
     
     -- Clear all existing chunks (incompatible dimensions)
     TRUNCATE TABLE chunks CASCADE;
-    RAISE NOTICE '  → Truncated chunks table (existing embeddings are incompatible)';
+    RAISE NOTICE '  → Truncated chunks table';
     
     -- Update all files to require re-processing
-    UPDATE files SET status = 'ready', error_message = NULL;
-    RAISE NOTICE '  → Reset file status (users must re-upload to regenerate embeddings)';
+    UPDATE files SET status = 'ready', error_message = NULL WHERE status != 'ready';
+    RAISE NOTICE '  → Reset file status';
     
-    -- Alter embedding column to 1024 dimensions
-    ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(1024);
+    -- Drop and recreate embedding column with new dimension
+    -- This is safer than ALTER COLUMN TYPE for pgvector
+    ALTER TABLE chunks DROP COLUMN embedding;
+    ALTER TABLE chunks ADD COLUMN embedding vector(1024);
     RAISE NOTICE '  → Updated embedding column to vector(1024)';
     
     RAISE NOTICE '✓ Embedding dimension migration completed. Users must re-upload documents.';
