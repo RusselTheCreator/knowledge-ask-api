@@ -34,9 +34,12 @@ RUN mkdir -p uploads
 # Expose port
 EXPOSE 6544
 
-# Health check
+# Health check - use curl (alpine-compatible) since app is ES module (require() doesn't work)
+# Install curl for health check
+RUN apk add --no-cache curl
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:${PORT:-6544}/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD curl -f http://localhost:${PORT:-6544}/health || exit 1
 
 # Start the application
 CMD ["npm", "start"]
