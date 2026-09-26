@@ -221,10 +221,20 @@ router.get('/history', authenticate, async (req, res) => {
       [req.user.id]
     );
     
+    // Transform snake_case database fields to camelCase to match ask/files format
+    const asks = result.rows.map(ask => ({
+      id: ask.id,
+      question: ask.question,
+      answer: ask.answer,
+      status: ask.status,
+      errorMessage: ask.error_message,
+      createdAt: ask.created_at
+    }));
+    
     res.json({
       message: 'Ask history retrieved successfully',
-      count: result.rows.length,
-      asks: result.rows
+      count: asks.length,
+      asks
     });
     
   } catch (error) {

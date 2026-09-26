@@ -240,6 +240,19 @@ describe('Ask API', () => {
     expect(response.status).toBe(200);
     expect(response.body.asks).toBeDefined();
     expect(response.body.asks.length).toBeGreaterThan(0);
+    
+    // Verify camelCase format (matching ask/files format)
+    const firstAsk = response.body.asks[0];
+    expect(firstAsk.id).toBeDefined();
+    expect(firstAsk.question).toBeDefined();
+    expect(firstAsk.status).toBeDefined();
+    expect(firstAsk.createdAt).toBeDefined();
+    // errorMessage may be null for successful asks
+    expect(firstAsk).toHaveProperty('errorMessage');
+    
+    // Ensure snake_case fields are NOT present
+    expect(firstAsk.created_at).toBeUndefined();
+    expect(firstAsk.error_message).toBeUndefined();
   });
 });
 
