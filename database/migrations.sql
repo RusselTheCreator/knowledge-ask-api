@@ -171,47 +171,53 @@ DECLARE
   current_dimension INTEGER;
   column_exists BOOLEAN;
 BEGIN
-  -- Check if embedding column exists
-  SELECT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'chunks' AND column_name = 'embedding'
-  ) INTO column_exists;
-  
-  IF NOT column_exists THEN
-    RAISE NOTICE '✓ Chunks table will be created with correct dimensions';
-    RETURN;
-  END IF;
-  
-  -- Get current embedding vector dimension
-  SELECT atttypmod - 4 INTO current_dimension
-  FROM pg_attribute
-  WHERE attrelid = 'chunks'::regclass
-  AND attname = 'embedding';
-  
-  -- Only migrate if dimension is 384 (mock) and not already 1024 (Bedrock)
-  IF current_dimension = 384 THEN
-    RAISE NOTICE 'Migrating embedding dimensions from 384 to 1024 for Bedrock Titan V2...';
+  BEGIN
+    -- Check if embedding column exists
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'chunks' AND column_name = 'embedding'
+    ) INTO column_exists;
     
-    -- Clear all existing chunks (incompatible dimensions)
-    TRUNCATE TABLE chunks CASCADE;
-    RAISE NOTICE '  → Truncated chunks table';
+    IF NOT column_exists THEN
+      RAISE NOTICE '✓ Chunks table will be created with correct dimensions';
+      RETURN;
+    END IF;
     
-    -- Update all files to require re-processing
-    UPDATE files SET status = 'ready', error_message = NULL WHERE status != 'ready';
-    RAISE NOTICE '  → Reset file status';
+    -- Get current embedding vector dimension
+    SELECT atttypmod - 4 INTO current_dimension
+    FROM pg_attribute
+    WHERE attrelid = 'chunks'::regclass
+    AND attname = 'embedding';
     
-    -- Drop and recreate embedding column with new dimension
-    -- This is safer than ALTER COLUMN TYPE for pgvector
-    ALTER TABLE chunks DROP COLUMN embedding;
-    ALTER TABLE chunks ADD COLUMN embedding vector(1024);
-    RAISE NOTICE '  → Updated embedding column to vector(1024)';
-    
-    RAISE NOTICE '✓ Embedding dimension migration completed. Users must re-upload documents.';
-  ELSIF current_dimension = 1024 THEN
-    RAISE NOTICE '✓ Embedding dimensions already at 1024 (Bedrock Titan V2)';
-  ELSE
-    RAISE NOTICE '⚠ Unexpected embedding dimension: % (expected 384 or 1024)', current_dimension;
-  END IF;
+    -- Only migrate if dimension is 384 (mock) and not already 1024 (Bedrock)
+    IF current_dimension = 384 THEN
+      RAISE NOTICE 'Migrating embedding dimensions from 384 to 1024 for Bedrock Titan V2...';
+      
+      -- Clear all existing chunks (incompatible dimensions)
+      TRUNCATE TABLE chunks CASCADE;
+      RAISE NOTICE '  → Truncated chunks table';
+      
+      -- Update all files to require re-processing
+      UPDATE files SET status = 'ready', error_message = NULL WHERE status != 'ready';
+      RAISE NOTICE '  → Reset file status';
+      
+      -- Drop and recreate embedding column with new dimension
+      -- This is safer than ALTER COLUMN TYPE for pgvector
+      ALTER TABLE chunks DROP COLUMN embedding;
+      ALTER TABLE chunks ADD COLUMN embedding vector(1024);
+      RAISE NOTICE '  → Updated embedding column to vector(1024)';
+      
+      RAISE NOTICE '✓ Embedding dimension migration completed. Users must re-upload documents.';
+    ELSIF current_dimension = 1024 THEN
+      RAISE NOTICE '✓ Embedding dimensions already at 1024 (Bedrock Titan V2)';
+    ELSE
+      RAISE NOTICE '⚠ Unexpected embedding dimension: % (expected 384 or 1024)', current_dimension;
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE NOTICE '⚠ Migration 5 skipped due to error: %', SQLERRM;
+      -- Don't fail startup, just log and continue
+  END;
 END $$;
 
 -- Verify migration completed
