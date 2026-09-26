@@ -7,6 +7,7 @@
  * Supported providers:
  * - mock: Deterministic pseudo-embeddings (no API key needed, default)
  * - openai: OpenAI text-embedding-3-small (cost-effective, recommended for production)
+ * - bedrock: Amazon Titan Text Embeddings V2 (cost-effective, AWS)
  * 
  * Note: Gemini support available but not recommended for this deployment.
  * Set EMBEDDING_PROVIDER=gemini if needed (requires GEMINI_API_KEY).
@@ -14,6 +15,7 @@
 
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 
 dotenv.config();
 
@@ -124,6 +126,53 @@ async function generateGeminiEmbedding(text) {
 }
 
 /**
+ * Generate embeddings using Amazon Bedrock
+ * Uses amazon.titan-embed-text-v2:0 by default (cost-effective, suitable for production)
+ * Model can be overridden via BEDROCK_EMBED_MODEL environment variable
+ * 
+ * @param {string} text - Text to embed
+ * @returns {Promise<number[]>} Embedding vector (1024-dimensional by default)
+ */
+async function generateBedrockEmbedding(text) {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const region = process.env.AWS_REGION || 'us-east-1';
+  
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables are required for Bedrock embeddings');
+  }
+  
+  const model = process.env.BEDROCK_EMBED_MODEL || 'amazon.titan-embed-text-v2:0';
+  
+  const client = new BedrockRuntimeClient({
+    region,
+    credentials: {
+      accessKeyId,
+      secretAccessKey
+    }
+  });
+  
+  const payload = {
+    inputText: text
+  };
+  
+  const command = new InvokeModelCommand({
+    modelId: model,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: JSON.stringify(payload)
+  });
+  
+  try {
+    const response = await client.send(command);
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    return responseBody.embedding;
+  } catch (error) {
+    throw new Error(`Bedrock API error: ${error.message}`);
+  }
+}
+
+/**
  * Main embedding function - routes to the appropriate provider
  * 
  * @param {string} text - Text to embed
@@ -142,6 +191,9 @@ export async function generateEmbedding(text) {
       
       case 'gemini':
         return await generateGeminiEmbedding(text);
+      
+      case 'bedrock':
+        return await generateBedrockEmbedding(text);
       
       default:
         console.warn(`Unknown embedding provider: ${provider}, falling back to mock`);

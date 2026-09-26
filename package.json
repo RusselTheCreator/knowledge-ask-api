@@ -23,6 +23,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1141.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "csv-parse": "^7.0.2",
