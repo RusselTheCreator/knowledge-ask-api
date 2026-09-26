@@ -170,10 +170,12 @@ export async function ingestDocument(fileId, filePath, mimeType) {
       const embedding = await generateEmbedding(chunkText);
       
       // Store chunk and embedding in database
+      // Format embedding as pgvector literal: '[1.0,2.0,3.0,...]'
+      const vectorLiteral = `[${embedding.join(',')}]`;
       await pool.query(
         `INSERT INTO chunks (file_id, chunk_text, chunk_index, embedding)
-         VALUES ($1, $2, $3, $4)`,
-        [fileId, chunkText, i, JSON.stringify(embedding)]
+         VALUES ($1, $2, $3, $4::vector)`,
+        [fileId, chunkText, i, vectorLiteral]
       );
     }
     

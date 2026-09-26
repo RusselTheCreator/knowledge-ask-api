@@ -115,9 +115,13 @@ router.post('/', authenticate, askRateLimiter, async (req, res) => {
       }
       
       // Step 3: Calculate similarity scores for each chunk
-      // pgvector stores embeddings as JSON strings, so parse them
+      // pgvector returns embeddings as strings like '[1.0,2.0,3.0,...]'
       const chunksWithScores = chunksResult.rows.map(chunk => {
-        const chunkEmbedding = JSON.parse(chunk.embedding);
+        // Parse pgvector format: remove brackets and split by comma
+        const chunkEmbedding = chunk.embedding
+          .replace(/^\[|\]$/g, '') // Remove [ and ]
+          .split(',')
+          .map(Number);
         const similarity = cosineSimilarity(questionEmbedding, chunkEmbedding);
         
         return {
