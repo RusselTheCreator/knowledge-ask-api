@@ -188,6 +188,49 @@ describe('Files API', () => {
     
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toContain('text/plain');
+    expect(response.headers['content-disposition']).toContain('attachment');
+    expect(response.body).toBeDefined();
+  });
+  
+  test('GET /api/files/:id/download - should return 404 when file blob missing on disk', async () => {
+    // Upload a file first
+    const uploadResponse = await request(app)
+      .post('/api/files')
+      .set('Authorization', `Bearer ${testUser1Token}`)
+      .attach('file', 'test/fixtures/sample.csv');
+    
+    expect(uploadResponse.status).toBe(201);
+    const missingFileId = uploadResponse.body.file.id;
+    
+    // Get the file metadata to find storage path
+    const metadataResult = await pool.query(
+      'SELECT storage_path FROM files WHERE id = $1',
+      [missingFileId]
+    );
+    const storagePath = metadataResult.rows[0].storage_path;
+    
+    // Delete the actual file from disk (simulating ephemeral storage loss)
+    await fs.unlink(storagePath).catch(() => {});
+    
+    // Try to download - should get 404, not 500
+    const downloadResponse = await request(app)
+      .get(`/api/files/${missingFileId}/download`)
+      .set('Authorization', `Bearer ${testUser1Token}`);
+    
+    expect(downloadResponse.status).toBe(404);
+    expect(downloadResponse.body.error).toContain('content is no longer available');
+    
+    // Clean up metadata
+    await pool.query('DELETE FROM files WHERE id = $1', [missingFileId]);
+  });
+  
+  test('GET /api/files/:id/download - should reject access to other user file', async () => {
+    const response = await request(app)
+      .get(`/api/files/${testFileId}/download`)
+      .set('Authorization', `Bearer ${testUser2Token}`);
+    
+    expect(response.status).toBe(404);
+    expect(response.body.error).toContain('not found or access denied');
   });
 });
 
