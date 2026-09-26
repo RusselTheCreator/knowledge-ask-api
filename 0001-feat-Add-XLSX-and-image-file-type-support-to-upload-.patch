@@ -1,0 +1,38 @@
+From 6e277d55dd45ef96a4cc022f48b58ad279dd3dac Mon Sep 17 00:00:00 2001
+From: Cursor Cloud Agent <cloud-agent@cursor.com>
+Date: Sat, 26 Sep 2026 09:57:59 +0000
+Subject: [PATCH] feat: Add XLSX and image file type support to upload UI
+
+- Update file input accept attribute to include .xlsx, .png, .jpg, .jpeg
+- Update UI text to reflect new supported file types
+- Coordinates with backend multi-format support PR
+- Images will show clear error message until OCR is implemented
+---
+ src/components/FileUpload.tsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/components/FileUpload.tsx b/src/components/FileUpload.tsx
+index 58f48d3..707d9c6 100644
+--- a/src/components/FileUpload.tsx
++++ b/src/components/FileUpload.tsx
+@@ -66,7 +66,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
+         onChange={handleChange}
+         disabled={loading}
+         style={styles.fileInput}
+-        accept=".pdf,.txt,.md,.docx,.csv"
++        accept=".pdf,.txt,.md,.docx,.csv,.xlsx,.png,.jpg,.jpeg"
+       />
+       
+       <div
+@@ -93,7 +93,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
+               <strong>Click to upload</strong> or drag and drop
+             </p>
+             <p style={styles.subtext}>
+-              PDF, TXT, MD, DOCX, or CSV (max 10MB)
++              PDF, TXT, MD, DOCX, CSV, XLSX, PNG, or JPG (max 10MB)
+             </p>
+           </>
+         )}
+-- 
+2.43.0
+
