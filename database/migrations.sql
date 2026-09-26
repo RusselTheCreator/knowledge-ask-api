@@ -163,8 +163,45 @@ BEGIN
   END IF;
 END $$;
 
+-- Migration 5: Update embedding vector dimensions for Bedrock Titan V2
+-- Bedrock Titan V2 produces 1024-dimensional embeddings (vs 384 for mock)
+-- This migration clears existing chunks and updates the schema
+DO $$
+DECLARE
+  current_dimension INTEGER;
+BEGIN
+  -- Get current embedding vector dimension
+  SELECT atttypmod - 4 INTO current_dimension
+  FROM pg_attribute
+  WHERE attrelid = 'chunks'::regclass
+  AND attname = 'embedding';
+  
+  -- Only migrate if dimension is 384 (mock) and not already 1024 (Bedrock)
+  IF current_dimension = 384 THEN
+    RAISE NOTICE 'Migrating embedding dimensions from 384 to 1024 for Bedrock Titan V2...';
+    
+    -- Clear all existing chunks (incompatible dimensions)
+    TRUNCATE TABLE chunks CASCADE;
+    RAISE NOTICE '  → Truncated chunks table (existing embeddings are incompatible)';
+    
+    -- Update all files to require re-processing
+    UPDATE files SET status = 'ready', error_message = NULL;
+    RAISE NOTICE '  → Reset file status (users must re-upload to regenerate embeddings)';
+    
+    -- Alter embedding column to 1024 dimensions
+    ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(1024);
+    RAISE NOTICE '  → Updated embedding column to vector(1024)';
+    
+    RAISE NOTICE '✓ Embedding dimension migration completed. Users must re-upload documents.';
+  ELSIF current_dimension = 1024 THEN
+    RAISE NOTICE '✓ Embedding dimensions already at 1024 (Bedrock Titan V2)';
+  ELSE
+    RAISE NOTICE '⚠ Unexpected embedding dimension: % (expected 384 or 1024)', current_dimension;
+  END IF;
+END $$;
+
 -- Verify migration completed
 DO $$
 BEGIN
-  RAISE NOTICE '✓ Migration completed successfully';
+  RAISE NOTICE '✓ All migrations completed successfully';
 END $$;
