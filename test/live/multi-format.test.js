@@ -270,7 +270,8 @@ describe('Live Multi-Format API Tests', () => {
     result.sources.forEach(source => {
       expect(source.fileId).toBeDefined();
       expect(source.fileName).toBeDefined();
-      expect(source.chunkText).toBeDefined();
+      expect(source.excerpt).toBeDefined();
+      expect(source.relevanceScore).toBeDefined();
     });
   }, 60000);
   
