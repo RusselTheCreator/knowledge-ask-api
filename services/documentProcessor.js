@@ -95,7 +95,8 @@ async function extractDOCX(buffer) {
 async function extractCSV(buffer) {
   const records = csvParse(buffer, {
     columns: true,
-    skip_empty_lines: true
+    skip_empty_lines: true,
+    relax_column_count: true
   });
   
   // Convert CSV records to readable text format

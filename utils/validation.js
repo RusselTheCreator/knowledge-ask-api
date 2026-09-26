@@ -134,11 +134,14 @@ function validateFileUpload(file) {
     'text/plain',
     'text/markdown',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-    'text/csv'
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'image/png',
+    'image/jpeg'
   ];
   
   // Allowed file extensions (additional security layer)
-  const allowedExtensions = ['.pdf', '.txt', '.md', '.docx', '.csv'];
+  const allowedExtensions = ['.pdf', '.txt', '.md', '.docx', '.csv', '.xlsx', '.png', '.jpg', '.jpeg'];
   
   if (!file) {
     return { 
@@ -166,7 +169,7 @@ function validateFileUpload(file) {
   if (!allowedMimeTypes.includes(file.mimetype)) {
     return { 
       valid: false, 
-      error: `File type '${file.mimetype}' is not supported. Allowed types: PDF, TXT, MD, DOCX, CSV.` 
+      error: `File type '${file.mimetype}' is not supported. Allowed types: PDF, TXT, MD, DOCX, CSV, XLSX, PNG, JPEG.` 
     };
   }
   
