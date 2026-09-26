@@ -288,6 +288,15 @@ router.get('/:id', authenticate, async (req, res) => {
       [askId]
     );
     
+    // Transform sources to camelCase to match POST /api/ask response
+    const sources = sourcesResult.rows.map(source => ({
+      fileId: source.file_id,
+      fileName: source.file_name,
+      chunkId: source.chunk_id,
+      relevanceScore: source.relevance_score,
+      excerpt: source.chunk_excerpt
+    }));
+    
     res.json({
       message: 'Ask details retrieved successfully',
       ask: {
@@ -297,7 +306,7 @@ router.get('/:id', authenticate, async (req, res) => {
         status: ask.status,
         errorMessage: ask.error_message,
         createdAt: ask.created_at,
-        sources: sourcesResult.rows
+        sources
       }
     });
     
