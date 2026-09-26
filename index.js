@@ -196,14 +196,12 @@ async function startServer() {
       }
     }
     
-    // Initialize database schema
-    await initializeDatabase();
-    
-    // Start listening
+    // Start listening FIRST so health checks pass immediately
+    // This prevents deployment failures while DB initialization runs
     app.listen(PORT, () => {
       console.log('');
       console.log('═══════════════════════════════════════════════════');
-      console.log('  🚀 Knowledge Ask API Server Started');
+      console.log('  🚀 Knowledge Ask API Server Starting');
       console.log('═══════════════════════════════════════════════════');
       console.log(`  📡 Server:      http://localhost:${PORT}`);
       console.log(`  📚 API Docs:    http://localhost:${PORT}/api/docs`);
@@ -212,6 +210,13 @@ async function startServer() {
       console.log(`  🧮 Embeddings:  ${process.env.EMBEDDING_PROVIDER || 'mock'}`);
       console.log('═══════════════════════════════════════════════════');
       console.log('');
+    });
+    
+    // Initialize database schema AFTER server is listening
+    // This runs in the background and won't block health checks
+    initializeDatabase().catch(error => {
+      console.error('Database initialization error:', error);
+      // Log but don't exit - server can still handle requests
     });
   } catch (error) {
     console.error('Failed to start server:', error);
