@@ -195,6 +195,29 @@ export function chunkText(text, chunkSize = 600, overlap = 100) {
  * @param {string} mimeType - MIME type of the file
  * @returns {Promise<void>}
  */
+/**
+ * Check if extracted text is meaningful (not just whitespace/junk)
+ * 
+ * @param {string} text - Extracted text
+ * @returns {boolean} True if text has meaningful content
+ */
+function hasRealContent(text) {
+  // Remove all whitespace
+  const stripped = text.replace(/\s+/g, '');
+  
+  // Must have at least some non-whitespace characters
+  if (stripped.length === 0) {
+    return false;
+  }
+  
+  // Count alphanumeric characters
+  const alphanumeric = stripped.replace(/[^a-zA-Z0-9]/g, '');
+  
+  // Require at least 10 alphanumeric characters to be considered real content
+  // This filters out PDFs with only metadata, form fields, or encoding artifacts
+  return alphanumeric.length >= 10;
+}
+
 export async function ingestDocument(fileId, filePath, mimeType) {
   try {
     console.log(`📄 Starting ingestion for file ID ${fileId}`);
@@ -202,6 +225,17 @@ export async function ingestDocument(fileId, filePath, mimeType) {
     // Step 1: Extract text from the file
     const text = await extractText(filePath, mimeType);
     console.log(`✅ Extracted ${text.length} characters of text`);
+    
+    // Fail-closed: Check if extracted text is meaningful
+    if (!hasRealContent(text)) {
+      const errorMsg = 'No meaningful text content found. The file may be blank, empty, a scanned PDF, or contain only images without text.';
+      console.error(`❌ No real content in file ${fileId}: ${errorMsg}`);
+      await pool.query(
+        `UPDATE files SET status = 'error', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [errorMsg, fileId]
+      );
+      throw new Error(errorMsg);
+    }
     
     // Step 2: Split text into chunks
     const chunkSize = parseInt(process.env.CHUNK_SIZE) || 600;

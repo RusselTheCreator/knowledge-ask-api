@@ -21,6 +21,7 @@ import pool from '../database/db.js';
 import authenticate from '../middleware/authenticate.js';
 import authorize from '../middleware/authorize.js';
 import { validateFileUpload } from '../utils/validation.js';
+import { detectMimeType } from '../utils/mimeDetection.js';
 import { ingestDocument } from '../services/documentProcessor.js';
 import { uploadRateLimiter } from '../middleware/rateLimit.js';
 
@@ -136,7 +137,20 @@ router.post('/', authenticate, uploadRateLimiter, upload.single('file'), handleM
       return res.status(400).json({ error: validation.error });
     }
     
-    // Insert file metadata into database
+    // Detect actual MIME type from file (do not trust client Content-Type alone)
+    let actualMimeType;
+    try {
+      actualMimeType = await detectMimeType(req.file.path, req.file.originalname, req.file.mimetype);
+    } catch (mimeError) {
+      // MIME detection failed - reject upload
+      console.error(`MIME detection failed for ${req.file.originalname}:`, mimeError.message);
+      await fs.unlink(req.file.path).catch(() => {});
+      return res.status(400).json({ 
+        error: `File validation failed: ${mimeError.message}` 
+      });
+    }
+    
+    // Insert file metadata into database with DETECTED mime type
     const result = await pool.query(
       `INSERT INTO files (user_id, original_name, mime_type, size_bytes, storage_path, status)
        VALUES ($1, $2, $3, $4, $5, 'processing')
@@ -144,7 +158,7 @@ router.post('/', authenticate, uploadRateLimiter, upload.single('file'), handleM
       [
         req.user.id,
         req.file.originalname,
-        req.file.mimetype,
+        actualMimeType,  // Use detected MIME, not client-provided
         req.file.size,
         req.file.path
       ]
@@ -152,11 +166,11 @@ router.post('/', authenticate, uploadRateLimiter, upload.single('file'), handleM
     
     const file = result.rows[0];
     
-    console.log(`📤 File uploaded: ${file.original_name} (ID: ${file.id})`);
+    console.log(`📤 File uploaded: ${file.original_name} (ID: ${file.id}, MIME: ${actualMimeType})`);
     
     // Start document ingestion asynchronously (don't wait for it)
     // This will extract text, chunk it, generate embeddings, and store in DB
-    ingestDocument(file.id, req.file.path, req.file.mimetype)
+    ingestDocument(file.id, req.file.path, actualMimeType)  // Use detected MIME
       .catch(error => {
         console.error(`Failed to ingest file ${file.id}:`, error);
       });
@@ -220,7 +234,7 @@ router.get('/', authenticate, async (req, res) => {
       // Admin viewing all files
       query = `
         SELECT f.id, f.user_id, u.name as user_name, f.original_name, f.mime_type, 
-               f.size_bytes, f.status, f.created_at,
+               f.size_bytes, f.status, f.error_message, f.created_at,
                (SELECT COUNT(*) FROM chunks WHERE file_id = f.id) as chunk_count
         FROM files f
         JOIN users u ON f.user_id = u.id
@@ -230,7 +244,8 @@ router.get('/', authenticate, async (req, res) => {
     } else {
       // User viewing their own files
       query = `
-        SELECT f.id, f.original_name, f.mime_type, f.size_bytes, f.status, f.created_at,
+        SELECT f.id, f.original_name, f.mime_type, f.size_bytes, f.status, 
+               f.error_message, f.created_at,
                (SELECT COUNT(*) FROM chunks WHERE file_id = f.id) as chunk_count
         FROM files f
         WHERE f.user_id = $1
@@ -241,10 +256,24 @@ router.get('/', authenticate, async (req, res) => {
     
     const result = await pool.query(query, params);
     
+    // Transform to camelCase to match GET /api/files/:id response
+    const files = result.rows.map(file => ({
+      id: file.id,
+      ...(file.user_id && { userId: file.user_id }),
+      ...(file.user_name && { userName: file.user_name }),
+      originalName: file.original_name,
+      mimeType: file.mime_type,
+      sizeBytes: file.size_bytes,
+      status: file.status,
+      errorMessage: file.error_message,
+      chunkCount: parseInt(file.chunk_count),
+      createdAt: file.created_at
+    }));
+    
     res.json({
       message: 'Files retrieved successfully',
-      count: result.rows.length,
-      files: result.rows
+      count: files.length,
+      files
     });
     
   } catch (error) {
