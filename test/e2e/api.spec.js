@@ -131,6 +131,14 @@ test.describe('Knowledge Ask API E2E Tests', () => {
     const historyData = await historyResponse.json();
     expect(historyData.asks.length).toBeGreaterThan(0);
     
+    // Verify camelCase format (matching ask/files format)
+    const firstAsk = historyData.asks[0];
+    expect(firstAsk.createdAt).toBeDefined();
+    expect(firstAsk).toHaveProperty('errorMessage');
+    // Ensure snake_case fields are NOT present
+    expect(firstAsk.created_at).toBeUndefined();
+    expect(firstAsk.error_message).toBeUndefined();
+    
     // Step 8: Download the file
     const downloadResponse = await request.get(`/api/files/${fileId}/download`, {
       headers: {
