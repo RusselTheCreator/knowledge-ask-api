@@ -29,7 +29,7 @@ beforeAll(async () => {
     .send({
       name: 'MIME Test User',
       email: `mime-test-${Date.now()}@test.com`,
-      password: 'Test123!@#',
+      password: 'mime-Integration-Test-9.credential',
       role: 'User'
     });
   
