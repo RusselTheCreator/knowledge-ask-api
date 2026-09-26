@@ -51,7 +51,10 @@ const ALLOWED_MIME_TYPES = [
   'text/plain',
   'text/markdown',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'text/csv'
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'image/png',
+  'image/jpeg'
 ];
 
 const upload = multer({
@@ -64,7 +67,7 @@ const upload = multer({
     if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`File type ${file.mimetype} not allowed. Supported types: PDF, TXT, MD, DOCX, CSV`));
+      cb(new Error(`File type ${file.mimetype} not allowed. Supported types: PDF, TXT, MD, DOCX, CSV, XLSX, PNG, JPEG`));
     }
   }
 });
