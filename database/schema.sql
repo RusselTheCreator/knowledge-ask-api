@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
   chunk_index INTEGER NOT NULL,
   chunk_text TEXT NOT NULL,
-  embedding vector(384), -- 384-dimensional vector for embeddings
+  embedding vector(1024), -- 1024-dimensional vector for Bedrock Titan V2 embeddings
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
